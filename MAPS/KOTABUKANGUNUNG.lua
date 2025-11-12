@@ -421,7 +421,7 @@ end
 routes = {
     {
         name = "BASE → CP8",
-        url = "https://raw.githubusercontent.com/v0ydxfc6666/json/refs/heads/main/KBG.json",
+        url = "https://raw.githubusercontent.com/syannnnnnn-h/ASTRION/refs/heads/main/JSON/KBG.json",
         data = nil
     },
 }
