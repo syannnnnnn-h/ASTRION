@@ -20,12 +20,12 @@ jobs:
       - name: Get changed maps
         id: get-maps
         run: |
-          # Get diff and extract new map names
-          git diff HEAD^ HEAD -- localgame.lua | grep "^+" | grep "name =" | sed 's/.*name = "\(.*\)".*/\1/' > new_maps.txt
+          # Get diff of localgame.lua
+          git diff HEAD^ HEAD -- localgame.lua | grep "^+" | grep "name =" | sed 's/.*name = "\(.*\)".*/\1/' > new_maps.txt || true
           
-          # Read maps and format them
+          # Check if there are new maps
           if [ -s new_maps.txt ]; then
-            MAPS=$(cat new_maps.txt | sed 's/^/[+] /' | tr '\n' '\n')
+            MAPS=$(cat new_maps.txt | sed 's/^/[+] /')
             echo "maps<<EOF" >> $GITHUB_OUTPUT
             echo "$MAPS" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -36,12 +36,22 @@ jobs:
       
       - name: Send Discord notification
         if: steps.get-maps.outputs.has_changes == 'true'
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
+          MAPS="${{ steps.get-maps.outputs.maps }}"
+          
+          # Create JSON payload
+          PAYLOAD=$(jq -n \
+            --arg content "<@&1437983499477848120> **ADDED**\`\`\`diff
+$MAPS
+\`\`\`
+**AUTOMATIC UPDATE!**" \
+            --arg username "AstrionHUB Auto Update" \
+            --arg avatar "https://ui-avatars.com/api/?name=Astrion&background=30ff6a&color=fff&size=128" \
+            '{content: $content, username: $username, avatar_url: $avatar}')
+          
+          # Send to Discord
           curl -H "Content-Type: application/json" \
-               -X POST \
-               -d '{
-                 "content": "<@&1437983499477848120> **ADDED**\n```diff\n${{ steps.get-maps.outputs.maps }}\n```\n**AUTOMATIC UPDATE!**",
-                 "username": "AstrionHUB Auto Update",
-                 "avatar_url": "https://ui-avatars.com/api/?name=Astrion&background=30ff6a&color=fff&size=128"
-               }' \
-               ${{ secrets.DISCORD_WEBHOOK_URL }}
+               -d "$PAYLOAD" \
+               "$WEBHOOK_URL"
