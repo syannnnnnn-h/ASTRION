@@ -1,0 +1,55 @@
+name: Discord Notification on File Update
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'localgame.lua'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      
+      - name: Get changed content
+        id: changes
+        run: |
+          # Get the diff of localgame.lua
+          git diff HEAD^ HEAD -- localgame.lua > diff.txt
+          
+          # Extract added lines (new maps)
+          NEW_MAPS=$(grep "^+" diff.txt | grep -v "^+++" | grep "name =" | sed 's/.*name = "\(.*\)".*/\1/' | tr '\n' ',' | sed 's/,$//')
+          
+          echo "new_maps=$NEW_MAPS" >> $GITHUB_OUTPUT
+      
+      - name: Send Discord Webhook
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          NEW_MAPS="${{ steps.changes.outputs.new_maps }}"
+          
+          if [ -n "$NEW_MAPS" ]; then
+            # Split maps by comma and format them
+            MAPS_FORMATTED=$(echo "$NEW_MAPS" | tr ',' '\n' | sed 's/^/[+] /')
+            
+            # Create webhook payload
+            PAYLOAD=$(cat <<EOF
+          {
+            "content": "<@&1437983499477848120> **ADDED**\n\`\`\`diff\n${MAPS_FORMATTED}\n\`\`\`\n**AUTOMATIC UPDATE!**",
+            "username": "AstrionHUB Auto Update",
+            "avatar_url": "https://cdn.discordapp.com/embed/avatars/0.png"
+          }
+          EOF
+          )
+            
+            # Send to Discord
+            curl -H "Content-Type: application/json" \
+                 -d "$PAYLOAD" \
+                 "$DISCORD_WEBHOOK"
+          fi
