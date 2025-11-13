@@ -5,6 +5,6 @@ return {
     },
     ["82748630433642"] = {
         name = "MOUNT YAGESYA",
-        url = ""
+        url = "https://raw.githubusercontent.com/syannnnnnn-h/ASTRION/refs/heads/main/JSON/YAGESYA.json"
     }
 }
