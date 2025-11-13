@@ -4,7 +4,7 @@ return {
         url = "https://raw.githubusercontent.com/.../KBG.json"
     },
     [135285569232987] = {
-        name = "Mount Velora",
+        name = "Mount Veloraa",
         url = "https://raw.githubusercontent.com/.../velora.json"
     }
 }
