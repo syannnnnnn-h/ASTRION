@@ -1,4 +1,4 @@
-name: Discord Notification on File Update
+name: Notify Discord on Map Update
 
 on:
   push:
@@ -8,48 +8,40 @@ on:
       - 'localgame.lua'
 
 jobs:
-  notify:
+  notify-discord:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 2
       
-      - name: Get changed content
-        id: changes
+      - name: Get changed maps
+        id: get-maps
         run: |
-          # Get the diff of localgame.lua
-          git diff HEAD^ HEAD -- localgame.lua > diff.txt
+          # Get diff and extract new map names
+          git diff HEAD^ HEAD -- localgame.lua | grep "^+" | grep "name =" | sed 's/.*name = "\(.*\)".*/\1/' > new_maps.txt
           
-          # Extract added lines (new maps)
-          NEW_MAPS=$(grep "^+" diff.txt | grep -v "^+++" | grep "name =" | sed 's/.*name = "\(.*\)".*/\1/' | tr '\n' ',' | sed 's/,$//')
-          
-          echo "new_maps=$NEW_MAPS" >> $GITHUB_OUTPUT
-      
-      - name: Send Discord Webhook
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          NEW_MAPS="${{ steps.changes.outputs.new_maps }}"
-          
-          if [ -n "$NEW_MAPS" ]; then
-            # Split maps by comma and format them
-            MAPS_FORMATTED=$(echo "$NEW_MAPS" | tr ',' '\n' | sed 's/^/[+] /')
-            
-            # Create webhook payload
-            PAYLOAD=$(cat <<EOF
-          {
-            "content": "<@&1437983499477848120> **ADDED**\n\`\`\`diff\n${MAPS_FORMATTED}\n\`\`\`\n**AUTOMATIC UPDATE!**",
-            "username": "AstrionHUB Auto Update",
-            "avatar_url": "https://cdn.discordapp.com/embed/avatars/0.png"
-          }
-          EOF
-          )
-            
-            # Send to Discord
-            curl -H "Content-Type: application/json" \
-                 -d "$PAYLOAD" \
-                 "$DISCORD_WEBHOOK"
+          # Read maps and format them
+          if [ -s new_maps.txt ]; then
+            MAPS=$(cat new_maps.txt | sed 's/^/[+] /' | tr '\n' '\n')
+            echo "maps<<EOF" >> $GITHUB_OUTPUT
+            echo "$MAPS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
+      
+      - name: Send Discord notification
+        if: steps.get-maps.outputs.has_changes == 'true'
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{
+                 "content": "<@&1437983499477848120> **ADDED**\n```diff\n${{ steps.get-maps.outputs.maps }}\n```\n**AUTOMATIC UPDATE!**",
+                 "username": "AstrionHUB Auto Update",
+                 "avatar_url": "https://ui-avatars.com/api/?name=Astrion&background=30ff6a&color=fff&size=128"
+               }' \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}
